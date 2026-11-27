@@ -71,7 +71,7 @@ async function main() {
     await c.eval(`(() => {
       const r = window.__rider;
       r.ui.show('countdown');
-      r.game.reset({ mode:'mixed', includeNew:true, gear:2, theme:'coast', vehicle:'bike', palette:'teal' });
+      r.game.reset({ includeNew:true, gear:2, theme:'coast', vehicle:'bike', palette:'teal' });
       r.game.start();
       return 1;
     })()`);

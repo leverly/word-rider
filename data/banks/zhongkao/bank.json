@@ -1,0 +1,25 @@
+{
+  "id": "zhongkao",
+  "name": "北京中考英语 · 课标词汇",
+  "lang": "en",
+  "starRatio": 0.2,
+  "tiers": {
+    "unit-01": {
+      "name": "核心高频",
+      "count": 513
+    },
+    "unit-02": {
+      "name": "常用词",
+      "count": 514
+    },
+    "unit-03": {
+      "name": "拓展词",
+      "count": 513
+    }
+  },
+  "source": {
+    "words": "ECDICT (tag=zk 中考) — MIT",
+    "phonetic": "ipa-dict en_UK 为主 / en_US 兜底 — CC BY-SA",
+    "sentences": "Tatoeba 中英对照 — CC BY 2.0 FR"
+  }
+}

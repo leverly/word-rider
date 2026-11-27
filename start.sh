@@ -10,9 +10,36 @@ if [ ! -d "node_modules/three" ]; then
   npm install --silent --no-audit --no-fund
 fi
 
-if [ ! -d "data/tts" ] || [ -z "$(ls -A data/tts 2>/dev/null)" ]; then
-  echo "▸ 生成语音资产（首次需要 1-2 分钟）…"
+# Edge TTS 的依赖装在 tools/ 下（与前端依赖分开）
+if [ ! -d "tools/node_modules/msedge-tts" ]; then
+  echo "▸ 安装语音依赖 msedge-tts …"
+  ( cd tools && npm install --silent --no-audit --no-fund )
+fi
+
+# 语音缺失时才生成。gen-tts 只在音频真实存在后才登记清单条目，
+# 所以「条目数 ≠ 文件数」就说明上次中途断了，续跑补齐剩余部分。
+BANK_ID="$(ls data/banks | head -1)"
+TTS_DIR="data/tts/$BANK_ID"
+MANIFEST="$TTS_DIR/manifest.json"
+
+tts_complete() {
+  [ -f "$MANIFEST" ] || return 1
+  local entries files
+  entries=$(grep -c '"file"' "$MANIFEST" 2>/dev/null || echo 0)
+  files=$(ls "$TTS_DIR"/*.mp3 "$TTS_DIR"/*.m4a 2>/dev/null | wc -l | tr -d ' ')
+  [ "$entries" -gt 0 ] && [ "$entries" -le "$files" ]
+}
+
+if ! tts_complete; then
+  echo "▸ 生成语音资产（Edge TTS，首次约 20 分钟）…"
   node tools/gen-tts.mjs
+fi
+
+# 启动前把关：清单/文件齐全，且音色必须是 Edge TTS（禁止 macOS say）
+if ! node tools/check-tts.mjs "$BANK_ID"; then
+  echo ""
+  echo "✘ 语音校验未通过。请执行：node tools/gen-tts.mjs --force"
+  exit 1
 fi
 
 echo "▸ 构建 …"

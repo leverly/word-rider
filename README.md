@@ -1,6 +1,9 @@
 # 词速骑行 Word Rider
 
-第一人称 · 3 轮 × 3 分钟 · 四车道。真 3D 卡通骑行游戏，用来背单词和练语法。
+第三人称 · 3 轮 × 3 分钟 · 四车道。真 3D 骑行游戏，用来背单词。
+
+**渲染**：PBR 材质 + HDRI 环境光照 + 软阴影 + ACES 色调映射。
+角色与载具由 Blender 建模导出 glTF，地形贴图与天空来自 CC0 资产库。
 
 **在线试玩**：https://leverly.github.io/word-rider/
 
@@ -15,26 +18,51 @@
 - 游戏：http://127.0.0.1:8899
 - 端口被占用会自动后移
 
+### 重建 3D 资产
+
+模型源码在 `assets_src/blender/`（Python，直接驱动 Blender 生成网格），
+产物是 `models/*.glb`。改模型后：
+
+```bash
+node scripts/build-3d.mjs            # Blender 建模 → 贴图处理 → 构建
+node scripts/build-3d.mjs --skip-blender   # 只重跑贴图与构建
+```
+
+需要 Blender 4.x（默认读 `/usr/local/bin/blender`，可用 `BLENDER=...` 覆盖）。
+
+### 视觉验证
+
+```bash
+node scripts/serve.mjs 8899 &
+node scripts/shoot-scene.mjs screenshots/scene 8899
+```
+
+会依次截四套天气与开局画面，并把控制台错误打出来。
+脚本走 `--use-angle=metal` 用真实 GPU；用 SwiftShader 软渲染会慢到几十秒一帧。
+
 ## 怎么玩
 
-开始页可以选 **赛道 / 座驾 / 配色**，每次选择都会立刻反映在背景里：
+开始页只有一个选项：**难度**（五档车速）。外观是固定的白天场景 + 自行车 + 青碧配色，不用挑。
 
-| 赛道 | 特色景物 |
-|---|---|
-| 海边 | 椰树、沙滩、海浪、灯塔、海鸥 |
-| 乡村 | 绿草地、麦田、木栅栏、红顶农舍、风车、干草堆 |
-| 草原 | 金色草浪、孤树、平顶山、草簇 |
+### 一条精品赛道 · 四种天气
 
-| 座驾 | 配色 |
-|---|---|
-| 自行车 | 青碧 / 珊瑚 / 墨夜 |
-| 滑板车 | 落日 / 薄荷 / 紫罗兰 |
+赛道是固定的风景公路：一侧湖泊、两侧林荫、远处雪峰与风车。
 
-骑手是**一只鹈鹕**：大白身、橙色大喙、喉囊、蹼足。骑自行车时坐着踩踏板，骑滑板车时站在甲板上握把。它会眨眼、随速度点头、围巾随风飘。
+| 天气 | 天空 | 地面 | 光 |
+|---|---|---|---|
+| 白天 | HDRI 真实云层 | 草地贴图 + 顶点色变化 | 强日照，长阴影 |
+| 黑夜 | 纯色夜空 + 粒子星空 | 压暗草地 | 月光 + 路灯亮斑 + 车灯光锥 |
+| 下雨 | 阴天 HDRI | 湿滑沥青（低粗糙度 + 反射） | 柔光，雨丝随风倾斜 |
+| 下雪 | 雪原 HDRI | 积雪贴图 | 高反照率，飘雪 + 浓雾 |
 
-选择会记住，下次打开还是上次的搭配。
+骑手是**一只鹈鹕**：大白身、橙色大喙、喉囊、蹼足。骑自行车时坐着踩踏板，
+骑滑板车时站在甲板上。它会眨眼、随速度点头、答对时抬翅欢呼、围巾随风飘。
 
-**第一人称视角**：镜头在鹈鹕的眼睛位置，看得到路面从脚下延伸，看不到自己的身体。
+> 注：开始页只暴露「难度」。四套天气、两种座驾、多套配色在引擎里都可用
+> （`world.setWeather(id)` / `world.setVehicle(kind, palette)`），
+> 运行时固定使用 `src/main.js` 的 `LOOK` 常量。
+
+**第三人称视角**：镜头在鹈鹕后上方，能看见骑手、座驾和整条路。换道时车身与镜头一起侧倾，速度越快 FOV 越广。
 
 ### 三轮制
 
@@ -73,7 +101,6 @@
 
 - **五种单词题型**：看词选义、听音选义、看义选词、例句填空、拼写补全，分别练 形→义、音→义、义→形、语境→形、义/音→精确拼写。
 - **拼写补全（W5，最难的拼写题）**：题干给「释义 + 挖空的词形」，缺 1~2 个字母（金色空格槽），整词可重听；四个选项是等长的字母组，填进空格。首尾字母不挖，优先挖元音与真拼写单位（`ea / oo / ck / tion / ence / able`），干扰项全取自真实拼写片段，靠长度猜不出来。
-- **语法题**：题干挖空，四选一，答后朗读完整正确句。
 - **间隔重复**：每题 6 级记忆箱（10 分钟 / 1 天 / 3 天 / 7 天 / 15 天 / 30 天）。果断答对升级，犹豫答对保持，答错归零。
 - **错题重现**：答错的题隔 4 题再出现，最多 2 次。
 - **即时反馈**：答错有 1 秒慢镜头，显示并朗读正确答案与解释。
@@ -81,14 +108,32 @@
 
 ## 换题库
 
+当前内置 **北京中考英语课标词汇**（1546 词，含音标、例句与词频分档）。
+
 题库放在 `data/banks/<名字>/`：
 
 ```
-data/banks/cet4/
-├── bank.json       { id, name, lang, defaultMix, starRatio }
-├── vocab.json      单词表
-└── grammar.json    语法题（可选）
+data/banks/zhongkao/
+├── bank.json       { id, name, lang, starRatio, tiers, source }
+└── vocab.json      单词表
 ```
+
+词库由 `tools/gen-bank.mjs` 从开放数据生成，不手写：
+
+| 字段 | 来源 |
+|---|---|
+| 词条范围 | [ECDICT](https://github.com/skywind3000/ECDICT) 中带 `zk`（中考）标签的词 — MIT |
+| 中文释义 / 词形 | 同上，按词性优先取义，剔除 `[计]` `[医]` 等领域标注 |
+| 音标 | [ipa-dict](https://github.com/open-dict-data/ipa-dict) `en_UK` 为主、`en_US` 兜底 — CC BY-SA |
+| 中英例句 | [Tatoeba](https://tatoeba.org) 中英对照句，繁体自动转简体 — CC BY 2.0 FR |
+
+```bash
+node tools/gen-bank.mjs            # 用缓存生成
+node tools/gen-bank.mjs --refresh  # 重新下载源数据
+```
+
+生成的词条按 ECDICT 词频分三档（`unit-01` 核心高频 / `unit-02` 常用 / `unit-03` 拓展），
+纯虚词（`a` `of` `to`）、缩写（`CD` `TV`）和带符号的词不进题库——四选一选释义没法区分它们。
 
 `vocab.json` 每条：
 
@@ -99,26 +144,17 @@ data/banks/cet4/
   "phonetic": "/əˈbændən/",
   "pos": "v",
   "meaning": "放弃；抛弃",
+  "senses": [{ "pos": "v", "zh": "放弃；抛弃" }],
   "sentence": "He abandoned the car on the highway.",
-  "group": "unit-01",
-  "star": true
+  "sentence_cn": "他把车丢在了高速公路上。",
+  "frq": 1152,
+  "rank": 214,
+  "group": "unit-01"
 }
 ```
 
-必填 `id` `word` `meaning` `pos`；`sentence` 用于例句填空和答后朗读；`star:true` 标记为星标题。
-
-`grammar.json` 每条：
-
-```json
-{
-  "id": "g-present-perfect-01",
-  "topic": "现在完成时",
-  "prompt": "I _____ in Beijing for ten years.",
-  "options": ["live", "have lived", "lived", "am living"],
-  "answer": 1,
-  "explanation": "for ten years 表示持续到现在的时间段，用现在完成时。"
-}
-```
+必填 `id` `word` `meaning` `pos`；`sentence` 用于例句填空和答后朗读；
+`group` 是词频档位；`star:true` 可手动指定星标题（不写则按 `starRatio` 随机分配）。
 
 加新题库后：
 
@@ -129,32 +165,66 @@ node tools/gen-tts.mjs   # 生成读音（增量，已有音频自动跳过）
 
 ## 语音
 
-**注意：Edge TTS 在当前网络环境不可用（返回 403）**，因此改用 macOS 内置 `say` 在构建期预生成音频，存在 `data/tts/<题库>/`，随站点部署、离线可用。
+朗读音频由 **Edge TTS** 在构建期预生成，存在 `data/tts/<题库>/`，随站点部署、离线可用。
 
-- 音色：单词用 Samantha，句子用 Alex（`tools/gen-tts.mjs` 里可改）
-- 缓存键 = `sha1(引擎+音色+文本)`，同一句跨题库复用
-- 想换回 Edge TTS：`node tools/gen-tts.mjs --engine edge`（需要网络能访问微软的语音服务）
+- 音色：单词 `en-US-AriaNeural`，例句 `en-US-GuyNeural`（`tools/gen-tts.mjs` 里可改）
+- 输出 24kHz / 48kbps 单声道 mp3，缓存键 = `sha1(引擎+音色+文本)`，同一句跨题库复用
+- 依赖 `tools/node_modules/msedge-tts` —— 它实现了 `Sec-MS-GEC v2` 签名。
+  **不要换成旧的 `edge-tts` 包，那个缺签名会稳定 403。**
+- `node tools/gen-tts.mjs --engine macos` 只是应急开关（系统 `say`），产物不作为交付。
 
 ## 技术
 
 纯前端，零后端进程：
 
 - **Three.js 0.187** 真 3D，`MeshToonMaterial` 三阶色阶 + 反向外壳描边做卡通风
-- **后处理**：UnrealBloom（只让高光溢出）+ ACES 色调映射 + SMAA + 自定义调色（饱和度/对比/晕影/速度线/闪光）
+- **后处理**：UnrealBloom（只让高光溢出）+ ACES 色调映射 + SMAA + 自定义调色（径向速度模糊 / 边缘色散 / 冲刺冷蓝染色 / 速度晕影 / 闪光 / 撞击颗粒）
+
+## 体感设计（参考赛车游戏）
+
+速度感不是靠「数值变快」，而是靠一整套互相印证的视觉线索：
+
+| 手段 | 实现 |
+|---|---|
+| **路面真的在流** | 车道虚线、路肩红白条、路边橙顶轮廓柱都以各自周期循环滚动；沥青有程序化颗粒纹理 |
+| **近景参照物** | 每 16 米一根轮廓柱，高速掠过时提供最强的速度参照 |
+| **镜头语言** | 横向弹簧滞后（换道有甩感）、换道 FOV 冲击、按横向速度压弯侧倾、加减速俯仰、高速细微起伏 |
+| **FOV 拉伸** | 基础 48° → 满速 +11° → 氮气再 +9°，冲刺时峰值约 66° |
+| **3D 速度线** | 车身两侧真实向后掠过的光条（不是屏幕假象），高速才显现 |
+| **氮气** | 双锥尾焰 + 蓝光地染 + 后处理冷蓝染色 + 点火扫频音效 |
+| **引擎声** | 锯齿基频 + 低八度 + 轻微失谐，随档位/速度升调，冲刺再抬 |
+
+调参集中在 `src/core/config.js` 的 `cam` 段与 `src/world/scene.js` 的 `GRADE_SHADER`。
 - **程序化建模**：全部代码生成，无外部模型文件
   - 座驾：自行车（真实比例，曲柄/脚踏联动）、滑板车（甲板/立管/小旗）
   - 骑手：鹈鹕（大喙 + 喉囊 + 蹼足 + 眨眼 + 围巾飘动）
   - 环境：三套主题各 10+ 种景物（椰树/灯塔/农舍/风车/孤树/平顶山…）
+- **天气系统**：四套配置（`src/world/themes.js` 的 `WEATHERS`）各自定义天空渐变、太阳光晕色与强度、平行光/半球光、环境光、雾的远近、曝光、饱和度/对比/晕影。切换时重建道路（景物换色、积雪、湿路面材质）并更新星空、月亮、雨、雪、车灯。
+- **天气特效**（`src/world/weather.js`）：
+  - 星空：900 点云上半球分布，缓慢天球旋转
+  - 月亮：圆盘 + 光晕，夜间可见
+  - 雨：2000 条线段的粒子系统，随车速倾斜，落地后在天幕范围内重生
+  - 雪：2600 个圆形贴图粒子，正弦横摆飘落
+  - 车灯：加色混合的光锥 + 地面光斑 + 点光源，跟随车辆横向位置
 - **音频**：WebAudio 实时合成音效与 BGM（随档位加密、最后 10 秒变奏），无音频素材文件
 - 无构建工具依赖，`scripts/build.mjs` 拷贝 + vendor three
 
-## 扩展新赛道 / 新配色
+## 改外观（可选，默认不暴露）
 
-编辑 `src/world/themes.js`：
+开始页不提供外观选项，固定使用 `src/main.js` 里的：
 
-- `THEMES` 加一项即可新增赛道（天空色、雾、地面色、景物列表、光照）
-- `PALETTES` 里给自行车/滑板车各加一条即新增配色
-- 新景物需要先在 `src/world/road.js` 的 `makePropBuilders()` 里实现建模函数
+```js
+const LOOK = { theme: 'day', vehicle: 'bike', palette: 'teal' };
+```
+
+想换就改这一行的值，可选值在 `src/world/themes.js`：
+
+- `theme`：`day` / `night` / `rain` / `snow`（`WEATHERS`）
+- `vehicle`：`bike` / `scooter`
+- `palette`：自行车 `teal` / `coral` / `midnight`，滑板车 `sunset` / `mint` / `violet`
+
+`TRACK` 控制赛道本身的景物组合（`props` 数组）与是否有湖；新景物需先在
+`src/world/road.js` 的 `makePropBuilders()` 里实现建模函数。天气特效在 `src/world/weather.js`。
 
 ## 目录
 
@@ -163,7 +233,7 @@ node tools/gen-tts.mjs   # 生成读音（增量，已有音频自动跳过）
 ├── start.sh                一键启动
 ├── src/                    前端源码
 │   ├── core/               配置、工具、题库加载、出题引擎、间隔重复
-│   ├── world/              3D 场景、主题、座驾、鹈鹕、道路、门架
+│   ├── world/              3D 场景、天气、座驾、鹈鹕、道路、门架
 │   ├── game/               游戏状态机、判分、道具
 │   ├── audio/              音效、BGM、语音
 │   ├── ui/                 HUD、开始页、暂停、结算
@@ -171,8 +241,8 @@ node tools/gen-tts.mjs   # 生成读音（增量，已有音频自动跳过）
 │   ├── index.html
 │   └── styles.css
 ├── data/
-│   ├── banks/cet4/         题库
-│   └── tts/cet4/           预生成语音 + manifest.json
+│   ├── banks/zhongkao/     题库
+│   └── tts/zhongkao/       预生成语音 + manifest.json
 ├── tools/gen-tts.mjs       语音生成
 ├── scripts/
 │   ├── build.mjs           构建 → app/
@@ -196,7 +266,33 @@ node tools/gen-tts.mjs   # 生成读音（增量，已有音频自动跳过）
 npm install
 node scripts/build.mjs      # 只构建，不启服务
 node scripts/serve.mjs 8899 # 起静态服务器
-node tools/gen-tts.mjs      # 增量补语音（macOS say）
+node tools/gen-tts.mjs      # 增量补语音（Edge TTS）
 ```
 
 `scripts/` 下还有一批无头 Chrome 截图/探针脚本（`shoot-*.mjs`、`probe-*.mjs`），用于回归检查界面与 HUD。
+
+### 答后反馈的回归检查
+
+改动画/判分/反馈相关逻辑后，先跑这个（纯逻辑，不需要浏览器，不受机器负载影响）：
+
+```bash
+node scripts/test-feedback.mjs
+```
+
+它断言了「答后驻留」这套时序的关键约定，任何一条被破坏都会立刻失败：
+
+- 答完后 HUD 停在**刚答的题**上（不立刻切下一题），答错 2.4s / 答对 0.75s
+- 驻留期间**不判分、不锁道、比赛倒计时不减**
+- 反馈条渲染在答题条内部（不会飘到屏幕中央挡住下一道门）
+- 门架掠过镜头时（z > `gatePassHideZ`）不再渲染，避免撑满屏幕
+- 按键/轻点可跳过解释，且有最短显示保护
+
+设计约定（别退回去）：
+1. **反馈不占屏幕中心**。中心是赛道消失点，也是下一道门升起的位置，任何居中弹窗都会挡住下一题。
+2. **答案和下一题不同屏**。先看完对错与解释，再切题。
+3. **学习不该被倒计时惩罚**。读解释的时间不计入比赛时间。
+
+要拍真实画面时：`node scripts/probe-answer.mjs` 量 DOM 矩形，`node scripts/shoot-answer.mjs <outDir>` 截图。
+注意无头 SwiftShader 跑真 3D 很慢，页面会长时间停在「正在载入题库…」（其实卡在 WebGL 初始化），
+机器 `uptime` 负载高于 10 时基本跑不动。
+

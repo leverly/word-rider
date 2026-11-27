@@ -11,8 +11,7 @@ export const CONFIG = {
   // ── 速度与节奏（米/秒） ──
   gears: [10, 12.5, 15, 17.5, 20],
   gearNames: ['轻松', '悠闲', '巡航', '迅捷', '冲刺'],
-  gateGapVocab: 110,     // 单词题两道门之间 110 米（巡航 7.3s / 冲刺 5.5s 读题）
-  gateGapGrammar: 155,   // 语法题句子长，给到 155 米（巡航 10.3s / 冲刺 7.8s）
+  gateGapVocab: 110,     // 两道门之间 110 米（巡航 7.3s / 冲刺 5.5s 读题）
   firstGateDist: 95,
   lockDistance: 6,       // 距门 6 米锁车道（留出一点余量，避免最后一刻误判）
 
@@ -38,7 +37,6 @@ export const CONFIG = {
 
   // ── 批次 ──
   batchSize: 60,
-  vocabGrammarMix: 0.7,  // 单词:语法
   starRatio: 0.22,
   retryGap: 4,           // 错题隔 4 题重现
   maxRetries: 2,
@@ -88,8 +86,24 @@ export const CONFIG = {
   laneColors: [0xe63946, 0xffc233, 0x159a6e, 0x1e7be0],
   laneCssColors: ['#e63946', '#ffc233', '#159a6e', '#1e7be0'],
   bikeZ: -2.2,
-  camFollowY: 4.9,
-  camFollowZ: 10.6,
+  camFollowY: 3.55,
+  camFollowZ: 6.9,
+
+  // ── 相机体感（赛车游戏的镜头语言） ──
+  cam: {
+    fovBase: 48,
+    fovSpeed: 11,        // 满速额外 FOV —— 速度感的主要来源
+    fovBoost: 9,         // 冲刺再叠
+    fovKick: 3.4,        // 换道瞬间的 FOV 冲击
+    followX: 0.62,       // 相机横向跟随比例（<1 让画面更稳）
+    lagLambda: 7.5,      // 横向跟随弹簧刚度
+    lookAhead: 26,       // 视线前瞻距离
+    rollAmount: 0.30,    // 转向侧倾幅度基准
+    pitchAmount: 0.02,   // 加减速俯仰
+    bobAmp: 0.035,       // 高速细微上下浮动
+    bobFreq: 11,
+    shakeDecay: 3.2,
+  },
 };
 
 export const LANE_LABELS = ['1', '2', '3', '4'];

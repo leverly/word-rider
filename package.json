@@ -6,8 +6,11 @@
   "description": "词速骑行 — 3D 背单词骑行游戏",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:3d": "node scripts/build-3d.mjs",
+    "build:assets": "node scripts/build-assets.mjs",
     "start": "node scripts/build.mjs && node scripts/serve.mjs 8899",
-    "tts": "node tools/gen-tts.mjs"
+    "tts": "node tools/gen-tts.mjs",
+    "shoot": "node scripts/shoot-scene.mjs screenshots/scene 8899"
   },
   "dependencies": {
     "three": "^0.187.0"

@@ -104,7 +104,7 @@ async function main() {
     // 只出单词题，全压 spell
     await c.eval(`(() => {
       const r = window.__rider;
-      r.game.reset({ mode: 'vocab', includeNew: true, gear: 2, theme: 'prairie', vehicle: 'bike', palette: 'teal' });
+      r.game.reset({ includeNew: true, gear: 2, theme: 'prairie', vehicle: 'bike', palette: 'teal' });
       r.ui.show('hud');
       r.game.start();
       // 直接把倒计时走完，省去 200+ 帧渲染

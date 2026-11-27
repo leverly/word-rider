@@ -310,12 +310,20 @@ kbd{
   min-width:0;
   padding-block:1px;   /* 避免 descender 被裁 */
 }
-/* 拼写题选项只是缺字母：放大 + 下划线，读起来像填空格 */
+/* 拼写题选项只是缺字母：放大成醒目的字母格 */
+.opt.letters{ justify-content:center }
+.opt.letters .n{ display:none }
 .opt.letters .t{
-  font-family:var(--num); font-size:clamp(22px,2.6vw,34px); font-weight:800;
-  letter-spacing:.04em; line-height:1.15; -webkit-line-clamp:1;
-  border-bottom:.08em solid currentColor; padding-bottom:.04em;
+  font-family:var(--num);
+  font-size:clamp(34px,4.6vw,56px);
+  font-weight:900;
+  line-height:1;
+  letter-spacing:0;
+  text-align:center;
+  -webkit-line-clamp:1;
+  text-shadow:0 3px 0 rgba(0,0,0,.18);
 }
+.opt.letters.selected .t{ text-shadow:0 3px 0 rgba(0,0,0,.10) }
 .opt.selected.letters .t{ border-bottom-color:#12203a }
 .opt .star-mini{
   flex:none; margin-left:auto; color:var(--gold); font-size:clamp(11px,1.2vw,14px);
@@ -707,45 +715,12 @@ kbd{
   box-shadow:0 0 10px 3px rgba(255,255,255,.4);
 }
 
-.card-icon{ font-size:26px; line-height:1.1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3)) }
 .cards.compact .card{ flex:1 1 0; min-width:80px; padding:9px 6px }
-
-/* 配色色板 */
-.swatches{ display:flex; gap:9px }
-.swatch{
-  display:flex; align-items:center; gap:8px;
-  padding:6px 12px 6px 7px; border-radius:999px; cursor:pointer;
-  background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.08);
-  color:var(--txt); font-family:var(--cn); font-size:12px; font-weight:700;
-  transition:all .18s var(--ease);
-}
-.swatch i{
-  width:20px; height:20px; border-radius:50%; background:var(--c);
-  box-shadow:inset 0 -2px 0 rgba(0,0,0,.22), 0 0 0 2px rgba(255,255,255,.14);
-  flex:none;
-}
-.swatch:hover{ background:rgba(255,255,255,.12) }
-.swatch.on{
-  border-color:#fff; background:rgba(255,255,255,.16);
-  box-shadow:0 0 0 3px rgba(255,255,255,.2);
-}
-.swatch.on i{ box-shadow:inset 0 -2px 0 rgba(0,0,0,.22), 0 0 0 3px rgba(255,255,255,.5) }
 
 @media(max-width:620px){
   .card small{ display:none }
   .card-art{ height:28px }
-  .swatch span{ display:none }
-  .swatch{ padding:6px }
 }
-
-/* 座驾图标 */
-.card-icon{
-  width:52px; height:34px; display:grid; place-items:center;
-  color:var(--vc,#7fe3d8);
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));
-}
-.card-icon svg{ width:100%; height:100%; display:block }
-.card.on .card-icon{ filter:drop-shadow(0 0 8px var(--vc,#7fe3d8)) }
 
 /* pill 不被拉伸（.hud-top 的列宽由内容决定） */
 .pill{ width:auto; flex:none }
@@ -863,4 +838,84 @@ kbd{
   .round-tag{ position:static; transform:none; display:none }
   .rr-list{ grid-template-columns:repeat(3,1fr); gap:6px }
   .rr-card{ padding:8px }
+}
+
+/* ───────── 情绪气泡（屏幕层，第一人称也可见） ───────── */
+#hud-emotes{
+  pointer-events:none;
+  overflow:hidden;
+  z-index:12;
+}
+.emote-bubble{
+  position:absolute;
+  left:50%;
+  top:74%;                       /* 从画面下方冒出，向上飘 */
+  transform:translate(-50%,-50%);
+  animation:emoteFloat 1.45s cubic-bezier(.22,.9,.3,1) forwards;
+  animation-delay:var(--delay,0s);
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
+  will-change:transform,opacity;
+  user-select:none;
+}
+@keyframes emoteFloat{
+  0%{
+    transform:translate(-50%,0) scale(.35) rotate(0deg);
+    opacity:0;
+  }
+  16%{
+    transform:translate(calc(-50% + var(--dx,0px) * .25), -12%) scale(1.25) rotate(calc(var(--rot,0deg) * .35));
+    opacity:1;
+  }
+  50%{
+    transform:translate(calc(-50% + var(--dx,0px) * .7), -46%) scale(1.05) rotate(calc(var(--rot,0deg) * .75));
+    opacity:1;
+  }
+  100%{
+    transform:translate(calc(-50% + var(--dx,0px)), -88%) scale(.8) rotate(var(--rot,0deg));
+    opacity:0;
+  }
+}
+
+/* 连击热度：屏幕轻微脉冲，强化爽感 */
+@keyframes comboPulse{
+  0%,100%{ transform:scale(1) }
+  45%{ transform:scale(1.16) }
+}
+.pill.combo.hot b{ animation:comboPulse .5s ease-out }
+
+/* 情绪气泡里的 SVG 图标 */
+.emote-bubble svg{
+  width:1em; height:1em; display:block;
+}
+
+/* ───────── 里程碑横幅 ───────── */
+.milestone{
+  position:absolute;
+  left:50%;
+  top:27%;
+  transform:translateX(-50%);
+  padding:10px 26px;
+  border-radius:999px;
+  font-size:clamp(17px,2vw,24px);
+  font-weight:900;
+  letter-spacing:.02em;
+  white-space:nowrap;
+  color:#12203a;
+  background:linear-gradient(180deg,#ffe89a,#ffc233 60%,#f2b01c);
+  border:2.5px solid #fff;
+  box-shadow:0 6px 0 rgba(150,100,10,.45), 0 14px 34px rgba(0,0,0,.34);
+  animation:milestonePop 1.75s cubic-bezier(.2,.9,.25,1) forwards;
+  pointer-events:none;
+}
+.milestone.minute{
+  background:linear-gradient(180deg,#a8e6ff,#5ee6ff 60%,#2fb8e0);
+  box-shadow:0 6px 0 rgba(20,90,120,.45), 0 14px 34px rgba(0,0,0,.3);
+  color:#062334;
+}
+@keyframes milestonePop{
+  0%{ transform:translateX(-50%) translateY(14px) scale(.55); opacity:0 }
+  14%{ transform:translateX(-50%) translateY(0) scale(1.12); opacity:1 }
+  24%{ transform:translateX(-50%) scale(1) }
+  78%{ transform:translateX(-50%) scale(1); opacity:1 }
+  100%{ transform:translateX(-50%) translateY(-26px) scale(.94); opacity:0 }
 }

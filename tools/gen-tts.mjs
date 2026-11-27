@@ -1,15 +1,17 @@
-// 生成读音资产：遍历题库，把需要朗读的文本合成成 m4a，写 manifest.json
+// 生成读音资产：遍历题库，把需要朗读的文本合成成 mp3，写 manifest.json
 //
 // 引擎：
-//   macos  —— macOS 内置 say（默认，离线可用，质量好）
-//   edge   —— Edge TTS（需要能访问微软服务；本环境 403，留作以后切换）
+//   edge   —— Edge TTS（默认，必须用它。音色 en-US-AriaNeural / en-US-GuyNeural）
+//   macos  —— macOS 内置 say。仅作应急开关，产物不算交付，禁止默认使用。
 //
 // 用法：
-//   node tools/gen-tts.mjs                # 增量生成当前题库缺失的音频
-//   node tools/gen-tts.mjs --force        # 全部重生成
-//   node tools/gen-tts.mjs --engine edge  # 切 Edge TTS
+//   node tools/gen-tts.mjs                  # 增量生成当前题库缺失的音频（Edge）
+//   node tools/gen-tts.mjs --force          # 全部重生成（Edge）
+//   node tools/gen-tts.mjs --engine macos   # 应急：用系统 say
 //
-// 缓存键 = sha1(音色 + 语速 + 文本)，同一句跨题库复用。
+// 缓存键 = sha1(引擎 + 音色 + 文本)，同一句跨题库复用。
+// 注意：Edge TTS 依赖 tools/node_modules/msedge-tts（带 Sec-MS-GEC v2 签名）。
+// 旧的 edge-tts 包缺签名会稳定 403，不要退回它。
 
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -26,8 +28,8 @@ const args = process.argv.slice(2);
 const FORCE = args.includes('--force');
 const ENGINE = (args.find(a => a.startsWith('--engine='))?.split('=')[1])
   || (args.includes('--engine') ? args[args.indexOf('--engine') + 1] : null)
-  || 'macos';
-const CONCURRENCY = 4;
+  || 'edge';
+const CONCURRENCY = 3;
 
 // 音色配置：单词用女声清晰，句子用男声略慢
 const VOICES = {
@@ -42,7 +44,7 @@ function textKey(voice, text) {
 }
 
 /* ── 需要朗读的文本清单 ── */
-function collectTexts(vocab, grammar) {
+function collectTexts(vocab) {
   const items = [];
   const add = (kind, voiceRole, text) => {
     if (!text || !String(text).trim()) return;
@@ -53,12 +55,6 @@ function collectTexts(vocab, grammar) {
     add('word', 'word', v.word);
     if (v.sentence) add('sentence', 'sentence', v.sentence);
   }
-  for (const g of grammar) {
-    // 题干：把空格念成短暂停顿（say 用逗号近似），答后念完整正确句
-    if (g.prompt) add('sentence', 'sentence', g.prompt.replace(/_{2,}/g, ', '));
-    const correct = fillPrompt(g.prompt, g.options[g.answer]);
-    add('sentence', 'sentence', correct);
-  }
 
   // 去重
   const seen = new Set();
@@ -68,10 +64,6 @@ function collectTexts(vocab, grammar) {
     seen.add(k);
     return true;
   });
-}
-
-function fillPrompt(prompt, answer) {
-  return prompt.replace(/_{2,}/g, ` ${answer} `).replace(/\s+/g, ' ').trim();
 }
 
 /* ── 合成器 ── */
@@ -98,16 +90,35 @@ async function synthMacos(voice, text, destM4a) {
   ]);
 }
 
-let edgeTtsMod = null;
+let edgeMod = null;
 async function synthEdge(voice, text, destFile) {
-  if (!edgeTtsMod) {
-    const p = path.join(ROOT, 'tools', 'node_modules', 'edge-tts', 'out', 'index.js');
+  if (!edgeMod) {
+    const p = path.join(ROOT, 'tools', 'node_modules', 'msedge-tts', 'dist', 'index.js');
     if (!existsSync(p)) {
-      throw new Error('未安装 edge-tts。请在 tools/ 下执行：npm install edge-tts');
+      throw new Error('未安装 msedge-tts。请在 tools/ 下执行：npm install msedge-tts');
     }
-    edgeTtsMod = await import(p);
+    edgeMod = await import(p);
   }
-  await edgeTtsMod.ttsSave(text, destFile, { voice, rate: '-8%' });
+  const { MsEdgeTTS, OUTPUT_FORMAT } = edgeMod;
+  const tts = new MsEdgeTTS();
+  try {
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioStream } = tts.toStream(text);
+    const chunks = [];
+    await new Promise((resolve, reject) => {
+      // 单条硬超时：websocket 偶尔静默挂住，不设上限会拖死整批
+      const guard = setTimeout(() => reject(new Error(`edge-tts 超时: ${text.slice(0, 40)}`)), 25000);
+      audioStream.on('data', c => chunks.push(c));
+      audioStream.on('end', () => { clearTimeout(guard); resolve(); });
+      audioStream.on('error', e => { clearTimeout(guard); reject(e); });
+    });
+    const buf = Buffer.concat(chunks);
+    if (!buf.length) throw new Error(`edge-tts 返回空音频: ${text.slice(0, 40)}`);
+    await fs.writeFile(destFile, buf);
+  } finally {
+    // 必须显式关连接，否则超时/异常的 socket 会留下句柄让进程无法退出
+    try { tts.close(); } catch { /* ignore */ }
+  }
 }
 
 /* ── 主流程 ── */
@@ -132,16 +143,14 @@ async function main() {
     };
 
     const vocab = await readJson('vocab.json', []);
-    const grammar = await readJson('grammar.json', []);
-    const items = collectTexts(vocab, grammar);
+    const items = collectTexts(vocab);
 
     const outDir = path.join(TTS_ROOT, bankId);
     await fs.mkdir(outDir, { recursive: true });
 
     const manifestPath = path.join(outDir, 'manifest.json');
-    const manifest = existsSync(manifestPath)
-      ? JSON.parse(await fs.readFile(manifestPath, 'utf8'))
-      : {};
+    // 按当前题库的文本 + 当前引擎重建清单，旧引擎（如 macos）的条目自然被淘汰
+    const manifest = {};
 
     const ext = ENGINE === 'macos' ? '.m4a' : '.mp3';
     const voices = VOICES[ENGINE];
@@ -154,10 +163,13 @@ async function main() {
       const rel = `${bankId}/${file}`;
       const abs = path.join(TTS_ROOT, rel);
 
-      manifest[key] = { file: rel, text: it.text, voice, kind: it.kind };
-
-      if (!FORCE && existsSync(abs)) { totalSkip++; continue; }
-      todo.push({ voice, text: it.text, abs, file });
+      if (!FORCE && existsSync(abs)) {
+        // 只有音频真实存在才登记，避免清单指向还没生成的文件
+        manifest[key] = { file: rel, text: it.text, voice, kind: it.kind };
+        totalSkip++;
+        continue;
+      }
+      todo.push({ key, voice, text: it.text, abs, file, rel, kind: it.kind });
     }
 
     // 并发合成
@@ -171,6 +183,8 @@ async function main() {
         try {
           if (ENGINE === 'macos') await synthMacos(job.voice, job.text, job.abs);
           else await synthEdge(job.voice, job.text, job.abs);
+          // 成功后才登记进清单
+          manifest[job.key] = { file: job.rel, text: job.text, voice: job.voice, kind: job.kind };
           ok++;
         } catch (e) {
           failures.push({ text: job.text, error: e.message });

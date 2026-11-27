@@ -8,7 +8,7 @@ import { CONFIG } from '../core/config.js';
 import {
   clamp, damp, makeRng, pickWeighted, fmtTime,
 } from '../core/utils.js';
-import { makeVocabQuestion, makeGrammarQuestion, spreadAnswerIndex } from '../core/questions.js';
+import { makeVocabQuestion, spreadAnswerIndex } from '../core/questions.js';
 import { buildBatch } from '../core/srs.js';
 import { ttsUrlFor } from '../core/bank.js';
 
@@ -51,7 +51,7 @@ export class Game {
 
   reset(options = {}) {
     this.options = {
-      mode: 'mixed', includeNew: true, gear: 2,
+      includeNew: true, gear: 2,
       rounds: CONFIG.roundsPerMatch, ...options,
     };
 
@@ -67,6 +67,8 @@ export class Game {
     this.score = 0;
     this.combo = 0;
     this.maxCombo = 0;
+    this._milestones = new Set();
+    this._lastMinuteReport = 0;
     this.gear = this.options.gear;
     this.speed = CONFIG.gears[this.gear];
     this.lane = 1;
@@ -113,7 +115,6 @@ export class Game {
 
   rebuildQueue() {
     const batch = buildBatch(this.bank, this.srs, {
-      mode: this.options.mode,
       includeNew: this.options.includeNew,
       rng: this.rng,
     });
@@ -150,6 +151,7 @@ export class Game {
     this.audio.bgm.stop();
     this.audio.voice.stop();
     this.audio.sfx.setWind(0);
+    this.audio.sfx.silenceEngine?.();
     this.onEvent('state', this.state);
   }
 
@@ -169,9 +171,13 @@ export class Game {
     const alreadyRecorded = this._roundRecorded === this.roundIndex;
     this._roundRecorded = this.roundIndex;
     if (this._feedbackTimeout) clearTimeout(this._feedbackTimeout);
+    // 轮次结束：清掉答后驻留，别把解释卡带进下一轮
+    this.hudHold = null;
+    this.hudHoldExpired = true;
     this.audio.bgm.stop();
     this.audio.voice.stop();
     this.audio.sfx.setWind(0);
+    this.audio.sfx.silenceEngine?.();
     this.audio.sfx.finish();
     this.srs.save();
 
@@ -278,6 +284,7 @@ export class Game {
     this.audio.bgm.stop();
     this.audio.voice.stop();
     this.audio.sfx.setWind(0);
+    this.audio.sfx.silenceEngine?.();
     this.srs.save();
     this.onEvent('state', this.state);
     this.onEvent('finish', this.matchSummary());
@@ -394,7 +401,12 @@ export class Game {
         this.fx.flash = 0.26;
         this.fx.flashColor = [1, 0.86, 0.42];
         break;
-      case 'boost': this.active.boost = CONFIG.powerups.boost.dur; break;
+      case 'boost':
+        this.active.boost = CONFIG.powerups.boost.dur;
+        this.audio.sfx.nitro?.();
+        this.fx.flash = 0.2;
+        this.fx.flashColor = [0.55, 0.86, 1.0];
+        break;
       case 'slowmo': this.active.slowmo = CONFIG.powerups.slowmo.dur; break;
       case 'shield': this.shield = true; break;
       case 'fifty': this.fiftyOnNext = true; break;
@@ -409,6 +421,7 @@ export class Game {
     this.slots.push({ kind });
     this.starsEarned++;
     this.audio.sfx.starChime();
+    this.world.pelicanMood?.('powerup', 1.2);
     this.onEvent('powerups', this.powerupState());
     return kind;
   }
@@ -492,7 +505,9 @@ export class Game {
     this.updateGates(gateDt);
 
     // 音频
-    this.audio.sfx.setWind(clamp((this.speed - 8) / 16, 0, 1));
+    const windLevel = clamp((this.speed - 8) / 16, 0, 1);
+    this.audio.sfx.setWind(windLevel);
+    this.audio.sfx.setEngine?.(windLevel, this.gear, this.active.boost > 0);
     this.audio.bgm.setIntensity(clamp(this.gear / 4, 0, 1));
     this.audio.bgm.setRush(this.remaining <= 10);
 
@@ -563,14 +578,12 @@ export class Game {
       }
       this.laneLocked = nowLocked;
 
-      if (approaching.gateObj) {
-        approaching.gateObj.setLaneSelected(
-          holding ? this.hudHold.chosen : this.lane
-        );
-      }
+      // 下一道门的高亮始终跟随玩家当前车道：
+      // 驻留期间车速很慢，玩家正好可以趁机把车挪到想好的车道
+      if (approaching.gateObj) approaching.gateObj.setLaneSelected(this.lane);
 
-      // 过门
-      if (approaching.z >= 0) this.resolveGate(approaching);
+      // 过门判分：驻留期间不判，避免解释还没看完就被下一题判了
+      if (!holding && approaching.z >= 0) this.resolveGate(approaching);
     }
 
     for (const g of this.gates) {
@@ -578,9 +591,11 @@ export class Game {
       g.gateObj.group.position.z = g.z;
       g.gateObj.update(dt);
 
-      // 过门后门架还会继续逼近相机：到 6 米时单块牌已占 65% 屏宽，
-      // 再靠近就撑满整屏把赛道糊住。所以掠身而过的那一刻就收掉。
-      g.gateObj.group.visible = g.z > -260 && g.z <= CONFIG.gatePassHideZ;
+      // 过门后门架继续逼近相机。第一人称镜头在 z≈-2.8，
+      // 门一旦越过镜头（z > rideZ）就会在身后被大 FOV 拉成糊屏色块，
+      // 所以只保留「镜头之前」的部分。
+      const camZ = CONFIG.bikeZ - 0.55;
+      g.gateObj.group.visible = g.z > -260 && g.z <= camZ;
     }
 
     // 预告剪影门
@@ -602,16 +617,14 @@ export class Game {
     const entry = this.queue[this.qIndex % this.queue.length];
     this.qIndex++;
 
-    const q = entry.kind === 'vocab'
-      ? makeVocabQuestion(entry.source, this.bank.vocab, this.rng, { answerIndex: entry.answerIndex })
-      : makeGrammarQuestion(entry.source, this.rng, { answerIndex: entry.answerIndex });
+    const q = makeVocabQuestion(entry.source, this.bank.vocab, this.rng, { answerIndex: entry.answerIndex });
 
     const isStar = !!entry.star && this.remaining > CONFIG.noStarLastSec;
 
     const gateObj = this.world.createGate();
     gateObj.configure(q, isStar);
 
-    const gap = entry.kind === 'grammar' ? CONFIG.gateGapGrammar : CONFIG.gateGapVocab;
+    const gap = CONFIG.gateGapVocab;
     // 首道门直接放在 firstGateDist 处；之后接在最远那道门后面再退 gap
     const z = this.gates.length
       ? Math.min(...this.gates.map(g => g.z)) - gap
@@ -696,6 +709,14 @@ export class Game {
       this.fx.flash = 0.15;
       this.fx.flashColor = [0.72, 1.0, 0.82];
 
+      // 鹈鹕欢呼：连击越高越兴奋
+      const cheerLevel = this.combo >= 8 ? 1.5 : this.combo >= 5 ? 1.3
+        : this.combo >= 3 ? 1.15 : 1.0;
+      this.world.pelicanMood?.(this.combo >= 5 ? 'superCheer' : 'cheer', cheerLevel);
+
+      // ── 中途里程碑：给孩子即时反馈，别等 3 分钟 ──
+      this._checkMilestone();
+
       if (gate.star) this.grantPowerup();
       this.speakAfter(q);
     } else {
@@ -703,6 +724,7 @@ export class Game {
         this.shield = false;
         shieldedHit = true;
         this.audio.sfx.shieldBreak();
+        this.world.pelicanMood?.('powerup', 0.9);
         this.fx.flash = 0.24;
         this.fx.flashColor = [0.5, 0.82, 1.0];
         this.onEvent('powerups', this.powerupState());
@@ -713,6 +735,7 @@ export class Game {
         this.fx.flashColor = [1, 0.44, 0.44];
         this.fx.shake = 0.5;
         this.audio.sfx.wrong();
+        this.world.pelicanMood?.('oops', 1.0);
       }
       this.answered++;
 
@@ -782,6 +805,44 @@ export class Game {
     });
 
     gate.resolved = true;
+  }
+
+  /** 连击/答题数里程碑，以及每分钟进度播报 */
+  _checkMilestone() {
+    const c = this.combo;
+
+    // 每 5 连击一次（5/10/15/20…）
+    if (c > 0 && c % 5 === 0) {
+      const key = 'combo' + c;
+      if (!this._milestones.has(key)) {
+        this._milestones.add(key);
+        const words = {
+          5: '连对 5！',
+          10: '连对 10！太厉害了',
+          15: '连对 15！停不下来',
+          20: '连对 20！神了',
+          25: '连对 25！',
+          30: '连对 30！',
+        };
+        this.onEvent('milestone', {
+          kind: 'combo',
+          count: c,
+          text: words[c] || `连对 ${c}！`,
+        });
+      }
+    }
+
+    // 每分钟报一次进度
+    const elapsed = CONFIG.durationSec - this.remaining;
+    const minute = Math.floor(elapsed / 60);
+    if (minute > this._lastMinuteReport && minute < Math.ceil(CONFIG.durationSec / 60)) {
+      this._lastMinuteReport = minute;
+      this.onEvent('milestone', {
+        kind: 'minute',
+        count: minute,
+        text: `第 ${minute} 分钟 · 已答对 ${this.correct} 题`,
+      });
+    }
   }
 
   speakAfter(q) {

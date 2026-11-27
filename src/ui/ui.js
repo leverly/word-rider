@@ -7,7 +7,6 @@ const TYPE_LABEL = {
   meaning2word: '看义选词',
   cloze: '例句填空',
   spell: '拼写补全',
-  grammar: '语法填空',
 };
 
 const $ = sel => document.querySelector(sel);
@@ -19,8 +18,8 @@ const el = (tag, cls, html) => {
 };
 
 export class UI {
-  constructor({ onStart, onResume, onRestart, onQuit, onToggleSound, onSetQuality, onPreview }) {
-    this.cb = { onStart, onResume, onRestart, onQuit, onToggleSound, onSetQuality, onPreview };
+  constructor({ onStart, onResume, onRestart, onQuit, onToggleSound, onSetQuality, onBankChange }) {
+    this.cb = { onStart, onResume, onRestart, onQuit, onToggleSound, onSetQuality, onBankChange };
     this.screens = {};
     this._buildStart();
     this._buildHud();
@@ -44,53 +43,28 @@ export class UI {
         </div>
 
         <div class="panel">
-          <div class="picker">
-            <div class="pick-group">
-              <label class="lbl">赛道</label>
-              <div class="cards" data-group="theme"></div>
-            </div>
-            <div class="pick-group">
-              <label class="lbl">座驾</label>
-              <div class="cards compact" data-group="vehicle"></div>
-            </div>
-            <div class="pick-group">
-              <label class="lbl">配色</label>
-              <div class="swatches" data-group="palette"></div>
+          <div class="picker" id="picker-wrap" style="display:none">
+            <div class="pick-group" id="pick-bank-group" style="display:none">
+              <label class="lbl">词库</label>
+              <div class="cards compact" data-group="bank"></div>
             </div>
           </div>
 
           <div class="row">
-            <label class="lbl">模式</label>
-            <div class="seg" data-group="mode">
-              <button data-v="mixed" class="on">混合</button>
-              <button data-v="vocab">只背单词</button>
-              <button data-v="grammar">只练语法</button>
-            </div>
-          </div>
-
-          <div class="row">
-            <label class="lbl">起始档位</label>
+            <label class="lbl">难度</label>
             <div class="seg" data-group="gear">
-              <button data-v="0">1</button>
-              <button data-v="1">2</button>
-              <button data-v="2" class="on">3</button>
-              <button data-v="3">4</button>
-              <button data-v="4">5</button>
-            </div>
-          </div>
-
-          <div class="row">
-            <label class="lbl">新词</label>
-            <div class="seg" data-group="new">
-              <button data-v="1" class="on">允许</button>
-              <button data-v="0">只复习到期</button>
+              <button data-v="0">慢慢骑</button>
+              <button data-v="1">有点快</button>
+              <button data-v="2" class="on">正好</button>
+              <button data-v="3">很快</button>
+              <button data-v="4">飞起来</button>
             </div>
           </div>
 
           <div class="stats" id="start-stats"></div>
 
           <button class="btn-primary" id="btn-start">
-            <span>开始骑行</span>
+            <span>出发！</span>
             <kbd>↵</kbd>
           </button>
 
@@ -106,10 +80,8 @@ export class UI {
     `;
 
     this.startOpts = {
-      mode: 'mixed', gear: 2, includeNew: true,
-      theme: 'coast', vehicle: 'bike', palette: 'teal',
+      gear: 2, includeNew: true, bank: null,
     };
-    this._buildPickers();
 
     s.querySelectorAll('.seg').forEach(seg => {
       seg.addEventListener('click', e => {
@@ -119,7 +91,6 @@ export class UI {
         btn.classList.add('on');
         const g = seg.dataset.group;
         const v = btn.dataset.v;
-        if (g === 'mode') this.startOpts.mode = v;
         if (g === 'gear') this.startOpts.gear = Number(v);
         if (g === 'new') this.startOpts.includeNew = v === '1';
       });
@@ -128,128 +99,46 @@ export class UI {
     $('#btn-start').addEventListener('click', () => this.cb.onStart({ ...this.startOpts }));
   }
 
-  _buildPickers() {
-    const THEME_CARDS = [
-      { id: 'coast', name: '海边', desc: '椰树 · 海浪 · 灯塔', c1: '#2fa8dd', c2: '#e8dcbc' },
-      { id: 'country', name: '乡村', desc: '麦田 · 栅栏 · 农舍', c1: '#6cba5c', c2: '#d8bd5e' },
-      { id: 'prairie', name: '草原', desc: '草浪 · 孤树 · 远山', c1: '#c9b463', c2: '#7cba5e' },
-    ];
-    const VEHICLES = [
-      {
-        id: 'bike', name: '自行车', color: '#7fe3d8',
-        svg: '<svg viewBox="0 0 48 32" fill="none">' +
-          '<circle cx="11" cy="22" r="7.5" stroke="currentColor" stroke-width="2.4"/>' +
-          '<circle cx="37" cy="22" r="7.5" stroke="currentColor" stroke-width="2.4"/>' +
-          '<path d="M11 22 L19 10 L30 10 L37 22 M19 10 L24 22 L11 22 M30 10 L27 6 L33 6"' +
-          ' stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<circle cx="24" cy="22" r="1.8" fill="currentColor"/>' +
-          '</svg>',
-      },
-      {
-        id: 'scooter', name: '滑板车', color: '#ffb07a',
-        svg: '<svg viewBox="0 0 48 32" fill="none">' +
-          '<circle cx="13" cy="24" r="5" stroke="currentColor" stroke-width="2.4"/>' +
-          '<circle cx="37" cy="24" r="4.2" stroke="currentColor" stroke-width="2.4"/>' +
-          '<path d="M13 24 L30 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
-          '<path d="M13 24 L17 7 L17 4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="M11 5 L23 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>' +
-          '</svg>',
-      },
-    ];
-    const PALETTES = {
-      bike: [
-        { id: 'teal', name: '青碧', c: '#1fb3ab' },
-        { id: 'coral', name: '珊瑚', c: '#f2705a' },
-        { id: 'midnight', name: '墨夜', c: '#35406b' },
-      ],
-      scooter: [
-        { id: 'sunset', name: '落日', c: '#ff7a45' },
-        { id: 'mint', name: '薄荷', c: '#3cc9a0' },
-        { id: 'violet', name: '紫罗兰', c: '#8a6fe0' },
-      ],
-    };
 
-    const themeBox = document.querySelector('.cards[data-group="theme"]');
-    themeBox.innerHTML = THEME_CARDS.map(t => `
-      <button class="card${t.id === this.startOpts.theme ? ' on' : ''}" data-v="${t.id}">
-        <span class="card-art" style="--c1:${t.c1};--c2:${t.c2}"></span>
-        <b>${t.name}</b>
-        <small>${t.desc}</small>
+  /** 设置可选词库（只有 2 个以上才显示） */
+  setBankOptions(banks, currentId) {
+    const wrap = document.getElementById('picker-wrap');
+    const group = document.getElementById('pick-bank-group');
+    const box = document.querySelector('.cards[data-group="bank"]');
+    if (!group || !box) return;
+    if (!banks || banks.length < 2) {
+      group.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
+      this.startOpts.bank = currentId;
+      return;
+    }
+    if (wrap) wrap.style.display = '';
+    group.style.display = '';
+    box.innerHTML = banks.map(b => `
+      <button class="card${b.id === currentId ? ' on' : ''}" data-v="${b.id}">
+        <b>${b.name || b.id}</b>
+        ${b.count ? `<small>${b.count} 词</small>` : ''}
       </button>
     `).join('');
-
-    const vehBox = document.querySelector('.cards[data-group="vehicle"]');
-    vehBox.innerHTML = VEHICLES.map(v => `
-      <button class="card${v.id === this.startOpts.vehicle ? ' on' : ''}" data-v="${v.id}">
-        <span class="card-icon" style="--vc:${v.color}">${v.svg}</span>
-        <b>${v.name}</b>
-      </button>
-    `).join('');
-
-    const palBox = document.querySelector('.swatches[data-group="palette"]');
-    const renderPalettes = () => {
-      const list = PALETTES[this.startOpts.vehicle] || PALETTES.bike;
-      palBox.innerHTML = list.map(p => `
-        <button class="swatch${p.id === this.startOpts.palette ? ' on' : ''}"
-                data-v="${p.id}" title="${p.name}" style="--c:${p.c}">
-          <i></i><span>${p.name}</span>
-        </button>
-      `).join('');
-      if (!list.some(p => p.id === this.startOpts.palette)) {
-        this.startOpts.palette = list[0].id;
-        palBox.querySelector('.swatch')?.classList.add('on');
-      }
-    };
-    renderPalettes();
-
-    themeBox.addEventListener('click', e => {
+    this.startOpts.bank = currentId;
+    box.addEventListener('click', e => {
       const btn = e.target.closest('.card');
       if (!btn) return;
-      themeBox.querySelectorAll('.card').forEach(b => b.classList.remove('on'));
+      box.querySelectorAll('.card').forEach(b => b.classList.remove('on'));
       btn.classList.add('on');
-      this.startOpts.theme = btn.dataset.v;
-      this.cb.onPreview?.({ ...this.startOpts });
+      this.startOpts.bank = btn.dataset.v;
+      this.cb.onBankChange?.(btn.dataset.v);
     });
-
-    vehBox.addEventListener('click', e => {
-      const btn = e.target.closest('.card');
-      if (!btn) return;
-      vehBox.querySelectorAll('.card').forEach(b => b.classList.remove('on'));
-      btn.classList.add('on');
-      this.startOpts.vehicle = btn.dataset.v;
-      renderPalettes();
-      this.cb.onPreview?.({ ...this.startOpts });
-    });
-
-    palBox.addEventListener('click', e => {
-      const btn = e.target.closest('.swatch');
-      if (!btn) return;
-      palBox.querySelectorAll('.swatch').forEach(b => b.classList.remove('on'));
-      btn.classList.add('on');
-      this.startOpts.palette = btn.dataset.v;
-      this.cb.onPreview?.({ ...this.startOpts });
-    });
-  }
-
-  syncPickers(opts) {
-    this.startOpts = { ...this.startOpts, ...opts };
-    // 同步 UI 选中态
-    document.querySelectorAll('.cards[data-group="theme"] .card').forEach(b =>
-      b.classList.toggle('on', b.dataset.v === opts.theme));
-    document.querySelectorAll('.cards[data-group="vehicle"] .card').forEach(b =>
-      b.classList.toggle('on', b.dataset.v === opts.vehicle));
-    document.querySelectorAll('.swatches .swatch').forEach(b =>
-      b.classList.toggle('on', b.dataset.v === opts.palette));
   }
 
   setStartStats(stats, best) {
     const box = $('#start-stats');
     if (!box) return;
     box.innerHTML = `
-      <div class="stat"><b>${stats.due}</b><span>今日待复习</span></div>
-      <div class="stat"><b>${stats.unseen}</b><span>未学新词</span></div>
-      <div class="stat"><b>${stats.mastered}</b><span>已掌握</span></div>
-      <div class="stat"><b>${best || 0}</b><span>最高分</span></div>
+      <div class="stat"><b>${stats.due}</b><span>今天要练</span></div>
+      <div class="stat"><b>${stats.unseen}</b><span>还没见过</span></div>
+      <div class="stat"><b>${stats.mastered}</b><span>已经学会</span></div>
+      <div class="stat"><b>${best || 0}</b><span>我的纪录</span></div>
     `;
   }
 
@@ -644,8 +533,10 @@ export class UI {
     if (bar) bar.classList.add('revealed');
 
     clearTimeout(this._fbTimer);
-    // 时长由游戏侧的驻留时间决定，这里只负责兜底清理
-    this._fbTimer = setTimeout(() => this.clearAnswer(), correct ? 1400 : 2800);
+    // 兜底清理：正常情况由主循环在「驻留结束」时清掉（见 main.js），
+    // 这里只在异常路径（例如卡帧）下防止反馈残留，所以给得比驻留宽松
+    this._fbTimer = setTimeout(() => this.clearAnswer(),
+      (correct ? CONFIG.feedbackHoldCorrect : CONFIG.feedbackHoldWrong) * 1000 + 800);
   }
 
   /** 收起答后反馈，回到干净的答题状态 */
@@ -659,6 +550,54 @@ export class UI {
     }
     const bar = $('.hud-bottom');
     if (bar) bar.classList.remove('revealed');
+  }
+
+  /**
+   * 屏幕层情绪气泡：第一人称看不到骑手时，情绪也要能被看见。
+   * 从屏幕下方（鹈鹕头部对应的位置）冒出来，向上飘并淡出。
+   */
+  emote(kind, intensity = 1) {
+    const layer = $('#hud-emotes');
+    if (!layer) return;
+
+    // 用内联 SVG 而不是 emoji —— emoji 依赖系统字体，不同设备颜色/形状不一致
+    const SVG = {
+      star: '<svg viewBox="0 0 24 24" fill="#ffd166" stroke="#a87000" stroke-width="1.4" stroke-linejoin="round"><path d="M12 2.6l2.7 6.1 6.6.6-5 4.5 1.5 6.5L12 16.9l-5.8 3.4 1.5-6.5-5-4.5 6.6-.6z"/></svg>',
+      heart: '<svg viewBox="0 0 24 24" fill="#ff5d7a" stroke="#b01838" stroke-width="1.2"><path d="M12 21c-6-4-9-7.6-9-11a4.6 4.6 0 0 1 9-1.6A4.6 4.6 0 0 1 21 10c0 3.4-3 7-9 11z"/></svg>',
+      note: '<svg viewBox="0 0 24 24" fill="#7ee0a8" stroke="#1f6b3f" stroke-width="1.2"><path d="M9 18.5a2.5 2.5 0 1 1-2-2.45V6.5l10-2v9a2.5 2.5 0 1 1-2-2.45V6.9L9 8.4z"/></svg>',
+      question: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#9cc4ff" stroke="#1f3d78" stroke-width="1.6"/><text x="12" y="17" text-anchor="middle" font-size="13" font-weight="900" fill="#1f3d78" font-family="ui-rounded,Helvetica,Arial">?</text></svg>',
+      sweat: '<svg viewBox="0 0 24 24"><path d="M12 2.5c3.4 4.6 6 8 6 11.2A6 6 0 0 1 6 13.7c0-3.2 2.6-6.6 6-11.2z" fill="#8fd6ff" stroke="#1a5680" stroke-width="1.4"/></svg>',
+      exclaim: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffd166" stroke="#a87000" stroke-width="1.6"/><rect x="10.9" y="5.5" width="2.2" height="8.4" rx="1.1" fill="#a87000"/><circle cx="12" cy="17.2" r="1.5" fill="#a87000"/></svg>',
+    };
+    const MAP = {
+      cheer: intensity >= 1.15 ? 'star' : 'note',
+      superCheer: intensity >= 1.3 ? 'heart' : 'star',
+      oops: intensity >= 1.2 ? 'sweat' : 'question',
+      powerup: 'exclaim',
+    };
+    const icon = SVG[MAP[kind] || 'note'];
+    if (!icon) return;
+
+    // 一次冒 2~3 个，稍微错开，形成「冒泡」感
+    const count = kind === 'superCheer' ? 3 : kind === 'oops' ? 1 : 2;
+    for (let i = 0; i < count; i++) {
+      const b = el('div', 'emote-bubble', icon);
+      b.style.setProperty('--dx', `${(Math.random() - 0.5) * 90}px`);
+      b.style.setProperty('--rot', `${(Math.random() - 0.5) * 34}deg`);
+      b.style.setProperty('--delay', `${i * 0.09}s`);
+      b.style.fontSize = `${26 + (kind === 'superCheer' ? 16 : 8) + Math.random() * 10}px`;
+      layer.appendChild(b);
+      setTimeout(() => b.remove(), 1500);
+    }
+  }
+
+  /** 里程碑横幅：屏幕上方中央弹出，1.6s 后自动消失 */
+  milestone(text, kind = 'combo') {
+    const layer = $('#hud-emotes');
+    if (!layer) return;
+    const b = el('div', 'milestone ' + kind, text);
+    layer.appendChild(b);
+    setTimeout(() => b.remove(), 1800);
   }
 
   setQuestion(gate) {

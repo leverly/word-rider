@@ -96,27 +96,19 @@ export class SRS {
 const clampBox = b => Math.max(0, Math.min(CONFIG.srsIntervalsMs.length - 1, Math.round(b) || 0));
 
 /**
- * 批次编排：凑够 batchSize 题，按模式混合，标记星标题
- * 返回条目数组：[{ id, kind:'vocab'|'grammar', source, star }]
+ * 批次编排：凑够 batchSize 题，标记星标题
+ * 题库只有单词题，返回条目数组：[{ id, kind:'vocab', source, star }]
  */
 export function buildBatch(bank, srs, opts = {}) {
   const {
-    mode = 'mixed',          // 'vocab' | 'grammar' | 'mixed'
     includeNew = true,
-    mix = bank.meta?.defaultMix?.vocab ?? CONFIG.vocabGrammarMix,
     size = CONFIG.batchSize,
     rng = Math.random,
     starRatio = bank.meta?.starRatio ?? CONFIG.starRatio,
   } = opts;
 
   const vocabIds = bank.vocab.map(v => v.id);
-  const grammarIds = bank.grammar.map(g => g.id);
-
-  // 按模式决定每类要多少
-  let vWant = 0, gWant = 0;
-  if (mode === 'vocab') { vWant = size; }
-  else if (mode === 'grammar') { gWant = size; }
-  else { vWant = Math.round(size * mix); gWant = size - vWant; }
+  const want = size;
 
   const picked = [];
 
@@ -157,30 +149,10 @@ export function buildBatch(bank, srs, opts = {}) {
     }
   };
 
-  takeFrom('vocab', vocabIds, bank.vocab, vWant);
-  takeFrom('grammar', grammarIds, bank.grammar, gWant);
-
-  // 交错排列，避免一整串同类
-  const ordered = interleave(picked, rng);
+  takeFrom('vocab', vocabIds, bank.vocab, want);
 
   // 标记星标题：题库里 star:true 的优先，其余按比例随机
-  return markStars(ordered, starRatio, rng);
-}
-
-function interleave(list, rng) {
-  const v = list.filter(x => x.kind === 'vocab');
-  const g = list.filter(x => x.kind === 'grammar');
-  const out = [];
-  // 按比例插入语法题
-  const total = list.length;
-  const gRatio = g.length / Math.max(1, total);
-  let vi = 0, gi = 0;
-  while (vi < v.length || gi < g.length) {
-    if (gi < g.length && (vi >= v.length || rng() < gRatio * 1.4)) out.push(g[gi++]);
-    else if (vi < v.length) out.push(v[vi++]);
-    else out.push(g[gi++]);
-  }
-  return out;
+  return markStars(picked, starRatio, rng);
 }
 
 function markStars(list, ratio, rng) {

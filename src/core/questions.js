@@ -2,8 +2,8 @@
 //
 // 每题结构：
 // {
-//   id, kind:'vocab'|'grammar',
-//   type: 'word2meaning'|'audio2meaning'|'meaning2word'|'cloze'|'spell'|'grammar',
+//   id, kind:'vocab',
+//   type: 'word2meaning'|'audio2meaning'|'meaning2word'|'cloze'|'spell',
 //   stem: { text, phonetic, pos, audioOnly, speaker }  // 门架题干牌
 //         spell 题另有 blank:{pre,hole,post}（空缺高亮）与 sub（释义）
 //   options: [4 个字符串]
@@ -171,6 +171,61 @@ function spellDistractors(item, pool, hole, rng) {
   return out;
 }
 
+/**
+ * 取释义的第一个义项，并截断过长内容。
+ * 中考词库里像 cup 这种有 5 个义项的词，全display 出来会让选项长度极不均衡，
+ * 孩子会靠「哪个长」来猜，而不是靠认词。
+ */
+export function shortMeaning(meaning, maxLen = 12) {
+  if (!meaning) return '';
+  // 按常见分隔符取第一段
+  const first = String(meaning).split(/[；;，,\/]/)[0].trim();
+  if (first.length <= maxLen) return first;
+  return first.slice(0, maxLen) + '…';
+}
+
+/**
+ * 例句是否适合做「例句填空」题。
+ * 面向小学生：句子太长、或含超纲词太多，读题本身就成了负担 —— 这时不出填空题。
+ */
+export function isSentenceKidFriendly(sentence, pool, opts = {}) {
+  if (!sentence) return false;
+  const maxWords = opts.maxWords ?? 8;
+  const maxHardRatio = opts.maxHardRatio ?? 0.28;
+
+  const words = sentence
+    .replace(/[^A-Za-z'\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length > maxWords) return false;
+
+  // 用题库自己的词表判断「超纲词」：不在词表里的实词算超纲
+  const vocab = new Set(pool.map(v => v.word.toLowerCase()));
+  // 常见虚词不算负担
+  const COMMON = new Set([
+    'a', 'an', 'the', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
+    'and', 'or', 'but', 'so', 'because', 'if', 'when', 'while', 'than', 'then',
+    'to', 'of', 'in', 'on', 'at', 'for', 'with', 'from', 'by', 'about', 'into',
+    'not', 'no', 'yes', 'do', 'does', 'did', 'have', 'has', 'had', 'will', 'would',
+    'can', 'could', 'may', 'might', 'must', 'should', 'very', 'too', 'also', 'just',
+    'up', 'down', 'out', 'off', 'over', 'all', 'some', 'any', 'many', 'much', 'more',
+    'one', 'two', 'three', 'first', 'last', 'new', 'old', 'good', 'bad', 'big', 'small',
+  ]);
+
+  let content = 0;
+  let unknown = 0;
+  for (const raw of words) {
+    const w = raw.toLowerCase().replace(/^'+|'+$/g, '');
+    if (!w || COMMON.has(w)) continue;
+    content++;
+    if (!vocab.has(w)) unknown++;
+  }
+  if (content === 0) return false;
+  return unknown / content <= maxHardRatio;
+}
+
 /** 为给定单词挑 3 个干扰项 */
 export function pickDistractors(target, pool, need, mode, rng) {
   // 排除自己、以及释义/拼写完全相同的
@@ -180,21 +235,43 @@ export function pickDistractors(target, pool, need, mode, rng) {
     v.word.toLowerCase() !== target.word.toLowerCase()
   );
 
+  // ── 难度梯度：尽量挑「同一水平」的词当干扰项 ──
+  // 小学生场景下最关键的是别让 coach 和 ability 同框 —— 四个词应该在同一档难度，
+  // 否则孩子连选项都不认识，只能瞎猜。
+  const trank = Number.isFinite(target.rank) ? target.rank : null;
+  // 词频相近度（0 = 同水平，越大跨度越大）；没有 rank 时不参与
+  const rankGap = (v) => {
+    if (trank === null || !Number.isFinite(v.rank)) return 1.2;   // 未知难度，轻微惩罚
+    return Math.min(3, Math.abs(v.rank - trank) / 600);
+  };
+
+  // 释义长度：不要让正确项是 5 字、干扰项是 28 字（孩子会靠长度猜）
+  const tLen = shortMeaning(target.meaning).length;
+  const lenGap = (v) => Math.min(2, Math.abs(shortMeaning(v.meaning).length - tLen) / 6);
+
   let ordered;
   if (mode === 'hard') {
-    // 形近（同词性优先）或义近
+    // 形近优先，但仍约束在相近词频段
     ordered = [...cands].sort((a, b) => {
-      const sa = (a.pos === target.pos ? 0 : 2) + editDistance(a.word, target.word) * 0.1 + (1 - charOverlap(a.meaning, target.meaning));
-      const sb = (b.pos === target.pos ? 0 : 2) + editDistance(b.word, target.word) * 0.1 + (1 - charOverlap(b.meaning, target.meaning));
+      const sa = rankGap(a) * 2 + lenGap(a) * 1.6 + (a.pos === target.pos ? 0 : 1.2)
+        + editDistance(a.word, target.word) * 0.06
+        + (1 - charOverlap(a.meaning, target.meaning)) * 0.5;
+      const sb = rankGap(b) * 2 + lenGap(b) * 1.6 + (b.pos === target.pos ? 0 : 1.2)
+        + editDistance(b.word, target.word) * 0.06
+        + (1 - charOverlap(b.meaning, target.meaning)) * 0.5;
       return sa - sb;
     });
   } else if (mode === 'easy') {
-    ordered = shuffle(cands, rng);
+    // 简单模式：优先「同水平 + 同词性」，再随机
+    ordered = shuffle(cands, rng).sort((a, b) =>
+      (rankGap(a) + lenGap(a) + (a.pos === target.pos ? 0 : 1.5))
+      - (rankGap(b) + lenGap(b) + (b.pos === target.pos ? 0 : 1.5)));
   } else {
-    // 中：同词性 → 同 group → 其余
-    const score = v =>
-      (v.pos === target.pos ? 0 : 10) +
-      (v.group && v.group === target.group ? 0 : 3);
+    // 中：同水平 → 同词性 → 同分组
+    const score = v => rankGap(v) * 3
+      + lenGap(v) * 2
+      + (v.pos === target.pos ? 0 : 2)
+      + (v.group && v.group === target.group ? 0 : 1);
     ordered = shuffle(cands, rng).sort((a, b) => score(a) - score(b));
   }
 
@@ -248,7 +325,7 @@ export function makeVocabQuestion(item, pool, rng, opts = {}) {
     const { options, answer } = buildOptions(item.word, wrongs, rng, wantIndex);
     return {
       id: item.id, kind: 'vocab', type: M2W,
-      stem: { text: item.meaning, phonetic: '', pos: item.pos, audioOnly: false, speaker: 'meaning' },
+      stem: { text: shortMeaning(item.meaning), phonetic: '', pos: item.pos, audioOnly: false, speaker: 'meaning' },
       options, answer,
       speakBefore: null,                      // 读出来就泄底
       speakAfter: item.word,
@@ -259,8 +336,8 @@ export function makeVocabQuestion(item, pool, rng, opts = {}) {
   }
 
   if (type === A2M) {
-    const wrongs = pickDistractors(item, pool, 3, distractorMode, rng).map(v => v.meaning);
-    const { options, answer } = buildOptions(item.meaning, wrongs, rng, wantIndex);
+    const wrongs = pickDistractors(item, pool, 3, distractorMode, rng).map(v => shortMeaning(v.meaning));
+    const { options, answer } = buildOptions(shortMeaning(item.meaning), wrongs, rng, wantIndex);
     return {
       id: item.id, kind: 'vocab', type: A2M,
       stem: { text: '🔊 听读音选含义', phonetic: '', pos: '', audioOnly: true, speaker: 'word' },
@@ -299,7 +376,12 @@ export function makeVocabQuestion(item, pool, rng, opts = {}) {
     };
   }
 
-  if (type === CLOZE && item.sentence && item.sentence.toLowerCase().includes(item.word.toLowerCase())) {
+  const clozeOk = type === CLOZE
+    && item.sentence
+    && item.sentence.toLowerCase().includes(item.word.toLowerCase())
+    && isSentenceKidFriendly(item.sentence, pool);
+
+  if (clozeOk) {
     const blanked = item.sentence.replace(
       new RegExp(item.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
       '_____'
@@ -319,8 +401,8 @@ export function makeVocabQuestion(item, pool, rng, opts = {}) {
   }
 
   // 默认 / 兜底：看词选义
-  const wrongs = pickDistractors(item, pool, 3, distractorMode, rng).map(v => v.meaning);
-  const { options, answer } = buildOptions(item.meaning, wrongs, rng, wantIndex);
+  const wrongs = pickDistractors(item, pool, 3, distractorMode, rng).map(v => shortMeaning(v.meaning));
+  const { options, answer } = buildOptions(shortMeaning(item.meaning), wrongs, rng, wantIndex);
   return {
     id: item.id, kind: 'vocab', type: V2M,
     stem: { text: item.word, phonetic: item.phonetic || '', pos: item.pos || '', audioOnly: false, speaker: 'word' },
@@ -329,39 +411,6 @@ export function makeVocabQuestion(item, pool, rng, opts = {}) {
     speakAfter: item.sentence || item.word,
     explain: `${item.word} ${item.phonetic || ''} — ${item.meaning}`.trim(),
     sentence: item.sentence || null,
-    source: item,
-  };
-}
-
-/** 生成一道语法题（选项由题库给定） */
-export function makeGrammarQuestion(item, rng, opts = {}) {
-  const wantIndex = opts.answerIndex ?? null;
-  const texts = [...item.options];
-  const correctText = item.options[item.answer];
-
-  let all = texts;
-  let answer = item.answer;
-  if (wantIndex !== null && wantIndex !== item.answer) {
-    all = [...texts];
-    [all[answer], all[wantIndex]] = [all[wantIndex], all[answer]];
-    answer = wantIndex;
-  } else {
-    // 轻微打乱，但保持正确项位置可控
-    const perm = shuffle([0, 1, 2, 3], rng);
-    all = perm.map(i => texts[i]);
-    answer = perm.indexOf(item.answer);
-  }
-
-  const filled = item.prompt.replace(/_{2,}/g, ` ${correctText} `).replace(/\s+/g, ' ').trim();
-
-  return {
-    id: item.id, kind: 'grammar', type: 'grammar',
-    stem: { text: item.prompt, phonetic: '', pos: item.topic || '', audioOnly: false, speaker: 'sentenceBlank' },
-    options: all, answer,
-    speakBefore: item.prompt.replace(/_{2,}/g, ', '),
-    speakAfter: filled,
-    explain: item.explanation || `正确答案：${correctText}`,
-    sentence: filled,
     source: item,
   };
 }
@@ -377,3 +426,4 @@ export function spreadAnswerIndex(seqIndex, rng) {
   })());
   return perm[offset];
 }
+

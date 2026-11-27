@@ -70,7 +70,7 @@ const START = `(() => {
     }
   } catch (e) { /* ignore */ }
   r.ui.show('countdown');
-  r.game.reset({ mode:'grammar', includeNew:true, gear:2, theme:'coast', vehicle:'bike', palette:'teal' });
+  r.game.reset({ includeNew:true, gear:2, theme:'coast', vehicle:'bike', palette:'teal' });
   r.game.start();
   const g = r.game;
   g.countdown = 0;
@@ -84,6 +84,15 @@ async function waitGate(c) {
   for (let i = 0; i < 400; i++) {
     if (await c.eval('!!window.__rider.game.currentGate')) return true;
     await sleep(100);
+  }
+  return false;
+}
+
+/** 等「答后驻留」真正建立：说明 resolveGate 已跑完、反馈已渲染 */
+async function waitHold(c) {
+  for (let i = 0; i < 400; i++) {
+    if (await c.eval('!!window.__rider.game.hudHold')) return true;
+    await sleep(60);
   }
   return false;
 }
@@ -122,6 +131,7 @@ async function main() {
       return 1;
     })()`);
     await sleep(200);
+    await waitHold(c);
     await c.shot('02-答错-反馈.png');
     await sleep(600);
     await c.shot('03-答错-仍在驻留.png');
@@ -144,6 +154,7 @@ async function main() {
       return 1;
     })()`);
     await sleep(200);
+    await waitHold(c);
     await c.shot('05-答对-反馈.png');
 
     // ③ 手机竖屏答错
@@ -160,6 +171,7 @@ async function main() {
       return 1;
     })()`);
     await sleep(200);
+    await waitHold(c);
     await c.shot('07-手机-答错.png');
 
     // 量化最终布局

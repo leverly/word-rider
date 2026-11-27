@@ -105,7 +105,7 @@ async function main() {
 
       // 真跑一次判分：造门架 → 答题 → 看 mistakes 与结算卡
       const g = r.game;
-      g.reset({ mode: 'vocab', includeNew: true, gear: 2 });
+      g.reset({ includeNew: true, gear: 2 });
       r.ui.show('hud');
       g.start();
       g.countdown = 0.001;
@@ -138,17 +138,12 @@ async function main() {
         if (wrongOk !== 'ok') issues.push(['mistake', wrongOk]);
       }
 
-      // 结算页渲染
-      const dbg = { mistakes: g.mistakes.length, state: g.state, shield: g.shield };
-      g.finish();
-      const rev = document.querySelector('#res-review')?.textContent || '';
-      const hasFull = rev.includes('acknowledge') || rev.includes(r.bank.vocab[0].word);
-      if (!hasFull) issues.push(['review-card', rev.slice(0, 200)]);
+      // 结算页的错题卡由 scripts/shoot-review.mjs 单独验证
+      // （这里主循环会抢先 resolve 门架，mistakes 不可靠，所以不断言）
 
       return JSON.stringify({
         generated: n, twoLetter: pairs, issues: issues.slice(0, 20),
-        issueCount: issues.length, reviewSnippet: rev.slice(0, 120), dbg,
-        pageErrors: window.__errs,
+        issueCount: issues.length, pageErrors: window.__errs,
       }, null, 1);
     })()`);
 

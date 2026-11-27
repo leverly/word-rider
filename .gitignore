@@ -21,6 +21,18 @@ Thumbs.db
 .vscode/
 .idea/
 
+# 词库生成脚本的源数据缓存（ECDICT / Tatoeba，约 180MB）
+.cache/
+
+# 素材下载缓存（CC0 贴图 / HDRI / 模型原始包，体积大）
+assets_src/_raw/
+assets_src/preview/
+
+# 3D 资产产物（由 node scripts/build-3d.mjs 从 assets_src/blender 生成）
+# 仓库里保留产物，避免部署时依赖 Blender；如果要改模型，跑 build:3d 重建
+# models/
+# src/assets/
+
 # 工具临时目录
 .v2c/
 .video_agent/

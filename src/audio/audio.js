@@ -22,6 +22,7 @@ export class Sfx {
     this.master.gain.value = this.volume;
     this.master.connect(this.ctx.destination);
     this._startWind();
+    this._startEngine();
   }
 
   resume() {
@@ -70,6 +71,73 @@ export class Sfx {
     const t = this.ctx.currentTime;
     this._wheelGain.gain.setTargetAtTime(clamp(level, 0, 1) * 0.075, t, 0.12);
     this._wheelFilter.frequency.setTargetAtTime(480 + level * 900, t, 0.2);
+  }
+
+  /* ── 持续引擎声：锯齿基频 + 低八度 + 轻微失谐，随速度升调 ── */
+  _startEngine() {
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(this.master);
+
+    // 低通把锯齿磨成发动机的闷响
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 620;
+    lp.Q.value = 1.1;
+    lp.connect(out);
+
+    const oscs = [];
+    const specs = [
+      { type: 'sawtooth', mul: 1, gain: 0.5 },
+      { type: 'square', mul: 0.5, gain: 0.35 },
+      { type: 'sawtooth', mul: 2.01, gain: 0.12 },   // 轻微失谐，避免电子琴味
+    ];
+    for (const sp of specs) {
+      const o = ctx.createOscillator();
+      o.type = sp.type;
+      o.frequency.value = 42 * sp.mul;
+      const g = ctx.createGain();
+      g.gain.value = sp.gain;
+      o.connect(g).connect(lp);
+      o.start();
+      oscs.push({ osc: o, mul: sp.mul });
+    }
+
+    this._engine = { out, lp, oscs, level: 0 };
+  }
+
+  /**
+   * @param {number} level 0..1 速度占比
+   * @param {number} gear  档位 0..4
+   * @param {boolean} boosting 是否冲刺
+   */
+  setEngine(level, gear = 2, boosting = false) {
+    const e = this._engine;
+    if (!e) return;
+    const t = this.ctx.currentTime;
+    const lv = clamp(level, 0, 1);
+    // 基础音高随档位与速度上升，冲刺再抬
+    const base = 40 + gear * 7 + lv * 34 + (boosting ? 12 : 0);
+    for (const { osc, mul } of e.oscs) {
+      osc.frequency.setTargetAtTime(base * mul, t, 0.08);
+    }
+    e.lp.frequency.setTargetAtTime(480 + lv * 900 + (boosting ? 500 : 0), t, 0.1);
+    e.out.gain.setTargetAtTime((0.055 + lv * 0.055 + (boosting ? 0.03 : 0)), t, 0.15);
+  }
+
+  /** 停车/暂停时关掉引擎 */
+  silenceEngine() {
+    const e = this._engine;
+    if (!e) return;
+    e.out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
+  }
+
+  /** 氮气点火：上升扫频 + 噪声爆 */
+  nitro() {
+    this.tone({ freq: 180, dur: 0.5, type: 'sawtooth', gain: 0.14, slideTo: 900 });
+    this.noise({ dur: 0.55, gain: 0.12, freq: 2400, q: 0.7 });
+    this.tone({ freq: 90, dur: 0.4, type: 'sine', gain: 0.16, slideTo: 160 });
   }
 
   /* ── 基础合成器 ── */

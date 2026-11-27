@@ -23,37 +23,33 @@ async function main() {
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   let quality = isMobile ? 'medium' : 'high';
 
-  /* ── 上次的选择 ── */
-  const LOOK_KEY = 'wordrider:look';
-  const DEFAULT_LOOK = { theme: 'coast', vehicle: 'bike', palette: 'teal' };
-  let savedLook = { ...DEFAULT_LOOK };
-  try {
-    const raw = localStorage.getItem(LOOK_KEY);
-    if (raw) savedLook = { ...DEFAULT_LOOK, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
+  /* ── 外观：固定一套，不再让玩家选 ── */
+  const LOOK = { theme: 'day', vehicle: 'bike', palette: 'teal' };
 
   /* ── 3D 世界 ── */
   bootHint.textContent = '正在构建赛道…';
-  const world = new World(canvas, innerWidth, innerHeight, quality, savedLook);
+  const world = new World(canvas, innerWidth, innerHeight, quality, LOOK);
+  window.__world = world;   // 截图脚本与调试用
 
   /* ── 题库 ── */
   bootHint.textContent = '正在载入题库…';
   let bank;
   let srs;
+  let bankList = [];
   try {
-    const list = await loadBankList();
-    const id = (list[0] && list[0].id) || 'cet4';
+    bankList = await loadBankList();
+    const id = (bankList[0] && bankList[0].id) || 'zhongkao';
     bank = await loadBank(id);
     srs = new SRS(id);
     if (!bank.vocab.length) throw new Error('题库为空');
-    bootHint.textContent = `已载入 ${bank.vocab.length} 个单词 · ${bank.grammar.length} 道语法题`;
+    bootHint.textContent = `已载入 ${bank.vocab.length} 个单词`;
   } catch (e) {
     console.error(e);
     bootHint.innerHTML = `题库载入失败：${e.message}<br>请确认通过本地服务器打开（不能直接双击 HTML）`;
     return;
   }
 
-  const bestKey = BEST_KEY(bank.id);
+  let bestKey = BEST_KEY(bank.id);
   const getBest = () => Number(localStorage.getItem(bestKey) || 0);
   const setBest = v => localStorage.setItem(bestKey, String(v));
 
@@ -62,7 +58,7 @@ async function main() {
   let game = new Game({ bank, srs, world, audio, onEvent: handleEvent });
 
   /* ── UI ── */
-  let lastOpts = { mode: 'mixed', gear: 2, includeNew: true, ...savedLook };
+  let lastOpts = { gear: 2, includeNew: true };
 
   const ui = new UI({
     onStart: (opts) => startRun(opts),
@@ -75,15 +71,31 @@ async function main() {
     onUsePowerup: (i) => game.usePowerup(i),
     onToggleSound: (on) => { sfx.enabled = on; voice.enabled = on; bgm.enabled = on; if (!on) { voice.stop(); bgm.stop(); sfx.setWind(0); } },
     onSetQuality: (hd) => setQuality(hd ? 'high' : 'medium'),
-    onPreview: (opts) => {
-      world.setTheme(opts.theme);
-      world.setVehicle(opts.vehicle, opts.palette);
-      try { localStorage.setItem(LOOK_KEY, JSON.stringify({ ...opts })); } catch { /* ignore */ }
-    },
+    onBankChange: (bankId) => switchBank(bankId),
   });
 
-  // 开始页显示上次的选择
-  ui.syncPickers(savedLook);
+  // 词库选择（多个词库时才显示）
+  const bankMeta = await Promise.all(bankList.map(async b => {
+    try {
+      const meta = await fetch(`data/banks/${b.id}/bank.json`).then(r => r.json());
+      const vocab = await fetch(`data/banks/${b.id}/vocab.json`).then(r => r.json());
+      return { id: b.id, name: meta.name || b.id, count: vocab.length };
+    } catch { return { id: b.id, name: b.id }; }
+  }));
+  ui.setBankOptions(bankMeta, bank.id);
+
+  async function switchBank(bankId) {
+    if (bankId === bank.id) return;
+    try {
+      bank = await loadBank(bankId);
+      srs = new SRS(bankId);
+      game = new Game({ bank, srs, world, audio, onEvent: handleEvent });
+      bestKey = BEST_KEY(bank.id);
+      refreshStart();
+    } catch (e) {
+      console.error('切换词库失败', e);
+    }
+  }
 
   /* ── 事件 ── */
   function handleEvent(type, payload) {
@@ -103,11 +115,29 @@ async function main() {
 
       case 'answer':
         ui.showAnswer(payload);
+        // 屏幕层情绪（第一人称看不到骑手，靠这个传达心情）
+        if (payload.correct) {
+          ui.emote(payload.combo >= 5 ? 'superCheer' : 'cheer',
+            payload.combo >= 8 ? 1.5 : payload.combo >= 5 ? 1.3 : payload.combo >= 3 ? 1.15 : 1.0);
+        } else if (!payload.shielded) {
+          ui.emote('oops', 1.0);
+        } else {
+          ui.emote('powerup', 0.9);
+        }
         if (payload.correct) {
           world.burstAtBike(
             payload.star ? [1, 0.84, 0.34] : [0.55, 1, 0.7],
             payload.star ? 60 : 30
           );
+        }
+        break;
+
+      case 'milestone':
+        ui.milestone(payload.text, payload.kind);
+        if (payload.kind === 'combo') {
+          // 里程碑时鹈鹕跳得更欢
+          world.pelicanMood?.('superCheer', 1.6);
+          sfx.starChime?.();
         }
         break;
 
@@ -145,7 +175,7 @@ async function main() {
     const best = getBest();
     if (sum.score > best) setBest(sum.score);
     ui.setStartStats(
-      srs.stats(bank.vocab.map(v => v.id).concat(bank.grammar.map(g => g.id))),
+      srs.stats(bank.vocab.map(v => v.id)),
       Math.max(best, sum.score)
     );
     ui.showResult(sum);
@@ -159,11 +189,6 @@ async function main() {
   /* ── 流程控制 ── */
   function startRun(opts) {
     lastOpts = { ...opts };
-    world.setTheme(opts.theme || 'coast');
-    world.setVehicle(opts.vehicle || 'bike', opts.palette || null);
-    try { localStorage.setItem(LOOK_KEY, JSON.stringify({
-      theme: opts.theme, vehicle: opts.vehicle, palette: opts.palette,
-    })); } catch { /* ignore */ }
     // 音频需要用户手势初始化
     sfx.init();
     sfx.resume();
@@ -221,7 +246,7 @@ async function main() {
   }
 
   function refreshStart() {
-    const ids = bank.vocab.map(v => v.id).concat(bank.grammar.map(g => g.id));
+    const ids = bank.vocab.map(v => v.id);
     ui.setStartStats(srs.stats(ids), getBest());
   }
 
