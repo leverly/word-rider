@@ -1,0 +1,7 @@
+{
+  "id": "cet4",
+  "name": "大学英语四级 · 核心词",
+  "lang": "en",
+  "defaultMix": { "vocab": 0.7, "grammar": 0.3 },
+  "starRatio": 0.22
+}

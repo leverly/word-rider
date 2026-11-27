@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>词速骑行 Word Rider</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🚴</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-screen="start">
+
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="layer"></div>
+
+<!-- 倒计时 -->
+<div id="countdown" class="layer overlay"></div>
+
+<!-- 开始页 -->
+<div id="screen-start" class="layer overlay screen"></div>
+
+<!-- 暂停 -->
+<div id="screen-pause" class="layer overlay screen"></div>
+
+<!-- 轮间过渡 -->
+<div id="screen-round" class="layer overlay screen"></div>
+
+<!-- 结算 -->
+<div id="screen-result" class="layer overlay screen"></div>
+
+<!-- 加载 -->
+<div id="loading" class="layer overlay boot">
+  <div class="boot-inner">
+    <div class="boot-word">词速骑行</div>
+    <div class="boot-bar"><i></i></div>
+    <div class="boot-hint" id="boot-hint">正在载入题库…</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

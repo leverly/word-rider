@@ -1,0 +1,247 @@
+[
+  {
+    "id": "g-present-perfect-01",
+    "topic": "现在完成时",
+    "prompt": "I _____ in Beijing for ten years.",
+    "options": ["live", "have lived", "lived", "am living"],
+    "answer": 1,
+    "explanation": "for ten years 表示持续到现在的时间段，用现在完成时。"
+  },
+  {
+    "id": "g-present-perfect-02",
+    "topic": "现在完成时",
+    "prompt": "She _____ her homework already.",
+    "options": ["finishes", "finished", "has finished", "is finishing"],
+    "answer": 2,
+    "explanation": "already 常与现在完成时连用，强调动作已完成。"
+  },
+  {
+    "id": "g-past-simple-01",
+    "topic": "一般过去时",
+    "prompt": "They _____ to the museum last Sunday.",
+    "options": ["go", "have gone", "went", "are going"],
+    "answer": 2,
+    "explanation": "last Sunday 是明确的过去时间点，用一般过去时。"
+  },
+  {
+    "id": "g-past-continuous-01",
+    "topic": "过去进行时",
+    "prompt": "I _____ dinner when the phone rang.",
+    "options": ["cook", "cooked", "was cooking", "have cooked"],
+    "answer": 2,
+    "explanation": "过去某一时刻正在进行的动作，用过去进行时。"
+  },
+  {
+    "id": "g-future-01",
+    "topic": "将来时",
+    "prompt": "We _____ the results tomorrow morning.",
+    "options": ["announce", "announced", "will announce", "have announced"],
+    "answer": 2,
+    "explanation": "tomorrow morning 指将来，用 will + 动词原形。"
+  },
+  {
+    "id": "g-passive-01",
+    "topic": "被动语态",
+    "prompt": "The bridge _____ in 1990.",
+    "options": ["built", "was built", "has built", "is building"],
+    "answer": 1,
+    "explanation": "桥是被建造的，且时间是过去，用过去式被动 was built。",
+    "star": true
+  },
+  {
+    "id": "g-passive-02",
+    "topic": "被动语态",
+    "prompt": "English _____ in many countries around the world.",
+    "options": ["speaks", "is spoken", "spoke", "is speaking"],
+    "answer": 1,
+    "explanation": "英语是被使用的语言，用一般现在时被动 is spoken。"
+  },
+  {
+    "id": "g-subjunctive-01",
+    "topic": "虚拟语气",
+    "prompt": "If I _____ you, I would take the offer.",
+    "options": ["am", "was", "were", "be"],
+    "answer": 2,
+    "explanation": "与现在事实相反的虚拟条件句，be 动词一律用 were。",
+    "star": true
+  },
+  {
+    "id": "g-subjunctive-02",
+    "topic": "虚拟语气",
+    "prompt": "She suggested that he _____ earlier.",
+    "options": ["arrives", "arrived", "arrive", "has arrived"],
+    "answer": 2,
+    "explanation": "suggest 表建议时，从句用 (should) + 动词原形，should 可省略。"
+  },
+  {
+    "id": "g-relative-01",
+    "topic": "定语从句",
+    "prompt": "The book _____ I borrowed is due tomorrow.",
+    "options": ["who", "which", "what", "whose"],
+    "answer": 1,
+    "explanation": "先行词是物 the book，关系代词用 which（或 that）。"
+  },
+  {
+    "id": "g-relative-02",
+    "topic": "定语从句",
+    "prompt": "This is the man _____ car was stolen.",
+    "options": ["who", "which", "whose", "that"],
+    "answer": 2,
+    "explanation": "表示「他的车」，用关系代词 whose 表所属。"
+  },
+  {
+    "id": "g-infinitive-01",
+    "topic": "非谓语动词",
+    "prompt": "He decided _____ the job offer.",
+    "options": ["accept", "accepting", "to accept", "accepted"],
+    "answer": 2,
+    "explanation": "decide 后接不定式 to do 作宾语。"
+  },
+  {
+    "id": "g-gerund-01",
+    "topic": "非谓语动词",
+    "prompt": "She enjoys _____ novels in her free time.",
+    "options": ["read", "to read", "reading", "reads"],
+    "answer": 2,
+    "explanation": "enjoy 后接动名词 doing 作宾语。"
+  },
+  {
+    "id": "g-modal-01",
+    "topic": "情态动词",
+    "prompt": "You _____ finish the report today; tomorrow is fine.",
+    "options": ["must", "needn't", "should", "ought to"],
+    "answer": 1,
+    "explanation": "后半句说明明天也行，表示「不必」，用 needn't。"
+  },
+  {
+    "id": "g-modal-02",
+    "topic": "情态动词",
+    "prompt": "The ground is wet. It _____ have rained last night.",
+    "options": ["must", "can", "should", "would"],
+    "answer": 0,
+    "explanation": "对过去事实的肯定推测，用 must have done。",
+    "star": true
+  },
+  {
+    "id": "g-comparative-01",
+    "topic": "比较级",
+    "prompt": "This test is _____ than the last one.",
+    "options": ["difficult", "more difficult", "most difficult", "the most difficult"],
+    "answer": 1,
+    "explanation": "两者比较用比较级，多音节形容词加 more。"
+  },
+  {
+    "id": "g-comparative-02",
+    "topic": "比较级",
+    "prompt": "The _____ you practice, the better you become.",
+    "options": ["much", "more", "most", "many"],
+    "answer": 1,
+    "explanation": "the + 比较级, the + 比较级，表示「越…越…」。"
+  },
+  {
+    "id": "g-article-01",
+    "topic": "冠词",
+    "prompt": "She plays _____ piano very well.",
+    "options": ["a", "an", "the", "不填"],
+    "answer": 2,
+    "explanation": "演奏乐器前用定冠词 the，如 play the piano。"
+  },
+  {
+    "id": "g-preposition-01",
+    "topic": "介词",
+    "prompt": "He is good _____ solving difficult problems.",
+    "options": ["at", "in", "on", "for"],
+    "answer": 0,
+    "explanation": "be good at doing sth. 表示擅长做某事。"
+  },
+  {
+    "id": "g-preposition-02",
+    "topic": "介词",
+    "prompt": "The meeting was postponed _____ the heavy rain.",
+    "options": ["because", "due to", "although", "so that"],
+    "answer": 1,
+    "explanation": "due to 后接名词短语表原因；because 后接句子。"
+  },
+  {
+    "id": "g-conjunction-01",
+    "topic": "连词",
+    "prompt": "_____ he was tired, he kept working.",
+    "options": ["Because", "Although", "So", "Unless"],
+    "answer": 1,
+    "explanation": "前后是让步关系，「虽然累但仍继续」，用 Although。"
+  },
+  {
+    "id": "g-conjunction-02",
+    "topic": "连词",
+    "prompt": "Study hard, _____ you will fail the exam.",
+    "options": ["and", "or", "but", "so"],
+    "answer": 1,
+    "explanation": "「否则」用 or，祈使句 + or + 结果。"
+  },
+  {
+    "id": "g-inversion-01",
+    "topic": "倒装",
+    "prompt": "Never _____ such a beautiful sunset.",
+    "options": ["I have seen", "have I seen", "I saw", "did I saw"],
+    "answer": 1,
+    "explanation": "否定词 Never 置于句首，主句部分倒装：have I seen。",
+    "star": true
+  },
+  {
+    "id": "g-inversion-02",
+    "topic": "倒装",
+    "prompt": "Only then _____ the importance of health.",
+    "options": ["he realized", "did he realize", "he did realize", "realized he"],
+    "answer": 1,
+    "explanation": "Only + 状语置于句首，主句部分倒装：did he realize。"
+  },
+  {
+    "id": "g-noun-clause-01",
+    "topic": "名词性从句",
+    "prompt": "_____ he said surprised everyone.",
+    "options": ["That", "Which", "What", "It"],
+    "answer": 2,
+    "explanation": "主语从句缺宾语，用 what 引导，意为「他所说的话」。"
+  },
+  {
+    "id": "g-noun-clause-02",
+    "topic": "名词性从句",
+    "prompt": "I don't know _____ he will come or not.",
+    "options": ["that", "if", "whether", "what"],
+    "answer": 2,
+    "explanation": "与 or not 搭配只能用 whether，不能用 if。"
+  },
+  {
+    "id": "g-adverb-01",
+    "topic": "副词",
+    "prompt": "She speaks English _____ than her brother.",
+    "options": ["fluent", "fluently", "more fluently", "most fluently"],
+    "answer": 2,
+    "explanation": "修饰动词 speaks 用副词，比较级加 more。"
+  },
+  {
+    "id": "g-tense-01",
+    "topic": "时态一致",
+    "prompt": "He said that he _____ the film before.",
+    "options": ["sees", "has seen", "had seen", "will see"],
+    "answer": 2,
+    "explanation": "主句是过去时，从句表示更早发生的动作，用过去完成时。"
+  },
+  {
+    "id": "g-tense-02",
+    "topic": "时态一致",
+    "prompt": "By the time we arrived, the show _____.",
+    "options": ["starts", "started", "had started", "has started"],
+    "answer": 2,
+    "explanation": "by the time + 过去时，主句用过去完成时表示「已经发生」。",
+    "star": true
+  },
+  {
+    "id": "g-verb-pattern-01",
+    "topic": "动词搭配",
+    "prompt": "The manager prevented him from _____ the meeting.",
+    "options": ["attend", "attending", "to attend", "attended"],
+    "answer": 1,
+    "explanation": "prevent sb. from doing sth.，介词 from 后接动名词。"
+  }
+]

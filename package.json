@@ -1,0 +1,15 @@
+{
+  "name": "word-rider",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "词速骑行 — 3D 背单词骑行游戏",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && node scripts/serve.mjs 8899",
+    "tts": "node tools/gen-tts.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  }
+}

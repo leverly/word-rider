@@ -1,0 +1,26 @@
+# 依赖
+node_modules/
+design/node_modules/
+
+# 构建产物（由 scripts/build.mjs 生成，不进仓库）
+app/
+
+# 设计稿与截图（体积大，属于工作过程产物）
+design/spell/
+screenshots/
+*.png
+
+# 日志
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/
+
+# 工具临时目录
+.v2c/
+.video_agent/
